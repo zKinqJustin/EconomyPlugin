@@ -1,0 +1,4 @@
+name: EconomyPlugin
+version: '1.0'
+main: de.zkinqjustin.economyPlugin.EconomyPlugin
+api-version: '1.21'
