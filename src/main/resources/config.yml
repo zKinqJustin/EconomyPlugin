@@ -1,0 +1,28 @@
+database:
+  host: localhost
+  port: 3306
+  name: economy
+  username: root
+  password: ""
+
+currency:
+  singular: "coin"
+  plural: "coins"
+
+messages:
+  player-only: "&cThis command can only be used by players."
+  balance: "&aYour balance: %amount%"
+  pay-usage: "&cUsage: /pay <player> <amount>"
+  player-not-found: "&cPlayer not found."
+  invalid-amount: "&cInvalid amount."
+  pay-success: "&aYou paid %amount% to %player%"
+  pay-received: "&aYou received %amount% from %player%"
+  insufficient-funds: "&cYou don't have enough money."
+  no-permission: "&cYou don't have permission to use this command."
+  balanceadd-usage: "&cUsage: /balanceadd <player> <amount>"
+  balanceadd-success: "&aAdded %amount% to %player%'s balance."
+  balanceadd-received: "&a%amount% has been added to your balance."
+  balanceadd-failed: "&cFailed to add money: %error%"
+
+PlaceholderAPI:
+  balance: "%economyplugin_balance%"

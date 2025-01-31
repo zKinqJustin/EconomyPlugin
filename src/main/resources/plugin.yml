@@ -2,3 +2,16 @@ name: EconomyPlugin
 version: '1.0'
 main: de.zkinqjustin.economyPlugin.EconomyPlugin
 api-version: '1.21'
+depend: ["Vault"]
+softdepend: ["PlaceholderAPI"]
+commands:
+  balance:
+    description: Check your balance
+    usage: /balance
+  pay:
+    description: Pay another player
+    usage: /pay <player> <amount>
+  balanceadd:
+    description: Add money to a player's balance
+    usage: /balanceadd <player> <amount>
+    permission: economyplugin.balanceadd
