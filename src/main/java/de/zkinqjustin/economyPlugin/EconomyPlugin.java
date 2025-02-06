@@ -19,6 +19,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class EconomyPlugin extends JavaPlugin implements Economy {
     private Connection connection;
@@ -50,12 +51,19 @@ public class EconomyPlugin extends JavaPlugin implements Economy {
         getServer().getServicesManager().register(Economy.class, this, this, ServicePriority.Normal);
 
         // Register commands
-        getCommand("balance").setExecutor(this);
-        getCommand("pay").setExecutor(this);
-        getCommand("balanceadd").setExecutor(this);
+        Objects.requireNonNull(getCommand("balance")).setExecutor(this);
+        Objects.requireNonNull(getCommand("pay")).setExecutor(this);
+        Objects.requireNonNull(getCommand("balanceadd")).setExecutor(this);
+        Objects.requireNonNull(getCommand("bank")).setExecutor(this);
 
         // Register PlaceholderAPI expansion
         new EconomyPlaceholders(this).register();
+
+        // Tab Completer registrieren
+        Objects.requireNonNull(getCommand("balance")).setTabCompleter(this);
+        Objects.requireNonNull(getCommand("pay")).setTabCompleter(this);
+        Objects.requireNonNull(getCommand("balanceadd")).setTabCompleter(this);
+        Objects.requireNonNull(getCommand("bank")).setTabCompleter(this);
 
         getLogger().info("EconomyPlugin has been enabled!");
     }
@@ -76,15 +84,20 @@ public class EconomyPlugin extends JavaPlugin implements Economy {
             Class.forName("org.mariadb.jdbc.Driver");
             connection = DriverManager.getConnection("jdbc:mariadb://" + host + ":" + port + "/" + database, username, password);
 
-            // Create table if not exists
+            // Create tables if not exists
             try (PreparedStatement stmt = connection.prepareStatement(
                     "CREATE TABLE IF NOT EXISTS player_balances (uuid VARCHAR(36) PRIMARY KEY, balance DOUBLE NOT NULL)")) {
+                stmt.executeUpdate();
+            }
+            
+            try (PreparedStatement stmt = connection.prepareStatement(
+                    "CREATE TABLE IF NOT EXISTS bank_balances (uuid VARCHAR(36) PRIMARY KEY, balance DOUBLE NOT NULL)")) {
                 stmt.executeUpdate();
             }
 
             return true;
         } catch (ClassNotFoundException | SQLException e) {
-            getLogger().severe("Database initialization error: " + e.getMessage());
+            getLogger().severe("Database error: " + e.getMessage());
             return false;
         }
     }
@@ -165,6 +178,55 @@ public class EconomyPlugin extends JavaPlugin implements Economy {
                     }
                 } catch (NumberFormatException e) {
                     player.sendMessage(colorize(getConfig().getString("messages.invalid-amount", "&cInvalid amount.")));
+                }
+                return true;
+
+            case "bank":
+                if (args.length == 0) {
+                    // Zeige Bankkontostand
+                    double bankBalance = getBankBalance(player);
+                    player.sendMessage(colorize("&aIhr Bankkontostand: " + format(bankBalance)));
+                    return true;
+                }
+                
+                if (args.length != 2) {
+                    player.sendMessage(colorize("&cVerwendung: /bank [deposit/withdraw] <Betrag>"));
+                    return true;
+                }
+                
+                try {
+                    double amount = Double.parseDouble(args[1]);
+                    if (amount <= 0) {
+                        player.sendMessage(colorize("&cDer Betrag muss positiv sein."));
+                        return true;
+                    }
+                    
+                    switch (args[0].toLowerCase()) {
+                        case "deposit":
+                            if (!has(player, amount)) {
+                                player.sendMessage(colorize("&cSie haben nicht genügend Geld."));
+                                return true;
+                            }
+                            withdrawPlayer(player, amount);
+                            depositToBank(player, amount);
+                            player.sendMessage(colorize("&a" + format(amount) + " wurden auf Ihr Bankkonto eingezahlt."));
+                            break;
+                            
+                        case "withdraw":
+                            if (!hasBankBalance(player, amount)) {
+                                player.sendMessage(colorize("&cNicht genügend Geld auf dem Bankkonto."));
+                                return true;
+                            }
+                            withdrawFromBank(player, amount);
+                            depositPlayer(player, amount);
+                            player.sendMessage(colorize("&a" + format(amount) + " wurden von Ihrem Bankkonto abgehoben."));
+                            break;
+                            
+                        default:
+                            player.sendMessage(colorize("&cVerwendung: /bank [deposit/withdraw] <Betrag>"));
+                    }
+                } catch (NumberFormatException e) {
+                    player.sendMessage(colorize("&cUngültiger Betrag."));
                 }
                 return true;
         }
@@ -455,6 +517,76 @@ public class EconomyPlugin extends JavaPlugin implements Economy {
     @Override
     public List<String> getBanks() {
         return new ArrayList<>();
+    }
+
+    // Neue Bank-Methoden
+    private double getBankBalance(OfflinePlayer player) {
+        try (PreparedStatement stmt = connection.prepareStatement("SELECT balance FROM bank_balances WHERE uuid = ?")) {
+            stmt.setString(1, player.getUniqueId().toString());
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("balance");
+                } else {
+                    createBankAccount(player);
+                    return 0.0;
+                }
+            }
+        } catch (SQLException e) {
+            getLogger().severe("Database error: " + e.getMessage());
+            return 0.0;
+        }
+    }
+
+    private boolean hasBankBalance(OfflinePlayer player, double amount) {
+        return getBankBalance(player) >= amount;
+    }
+
+    private void createBankAccount(OfflinePlayer player) {
+        try (PreparedStatement stmt = connection.prepareStatement("INSERT INTO bank_balances (uuid, balance) VALUES (?, 0)")) {
+            stmt.setString(1, player.getUniqueId().toString());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            getLogger().severe("Database error: " + e.getMessage());
+        }
+    }
+
+    private void depositToBank(OfflinePlayer player, double amount) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "INSERT INTO bank_balances (uuid, balance) VALUES (?, ?) ON DUPLICATE KEY UPDATE balance = balance + ?")) {
+            stmt.setString(1, player.getUniqueId().toString());
+            stmt.setDouble(2, amount);
+            stmt.setDouble(3, amount);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            getLogger().severe("Database error: " + e.getMessage());
+        }
+    }
+
+    private void withdrawFromBank(OfflinePlayer player, double amount) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "UPDATE bank_balances SET balance = balance - ? WHERE uuid = ?")) {
+            stmt.setDouble(1, amount);
+            stmt.setString(2, player.getUniqueId().toString());
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            getLogger().severe("Database error: " + e.getMessage());
+        }
+    }
+
+    // Tab Completion für Bank-Befehle
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        List<String> completions = new ArrayList<>();
+        
+        if (command.getName().equalsIgnoreCase("bank")) {
+            if (args.length == 1) {
+                completions.add("deposit");
+                completions.add("withdraw");
+                return completions;
+            }
+        }
+        
+        return null;
     }
 }
 

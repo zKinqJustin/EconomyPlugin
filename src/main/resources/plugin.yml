@@ -1,17 +1,20 @@
 name: EconomyPlugin
 version: '1.0'
 main: de.zkinqjustin.economyPlugin.EconomyPlugin
-api-version: '1.21'
+api-version: '1.20'
 depend: ["Vault"]
 softdepend: ["PlaceholderAPI"]
 commands:
   balance:
-    description: Check your balance
-    usage: /balance
+    description: Zeigt deinen Kontostand
+    aliases: [bal, money]
   pay:
-    description: Pay another player
-    usage: /pay <player> <amount>
+    description: Überweise Geld an einen anderen Spieler
   balanceadd:
-    description: Add money to a player's balance
-    usage: /balanceadd <player> <amount>
-    permission: economyplugin.balanceadd
+    description: Fügt einem Spieler Geld hinzu
+    usage: /balanceadd <spieler> <betrag>
+    permission: economy.balanceadd
+  bank:
+    description: Bank-Befehle
+    usage: /bank [deposit/withdraw] [Betrag]
+    aliases: [banking]
