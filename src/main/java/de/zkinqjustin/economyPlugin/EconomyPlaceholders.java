@@ -17,7 +17,7 @@ public class EconomyPlaceholders extends PlaceholderExpansion {
 
     @Override
     public String getAuthor() {
-        return "YourName";
+        return "zKinqJustin";
     }
 
     @Override

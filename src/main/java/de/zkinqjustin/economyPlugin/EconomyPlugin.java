@@ -29,6 +29,7 @@ public class EconomyPlugin extends JavaPlugin implements Economy {
 
     @Override
     public void onEnable() {
+
         // Load configuration
         saveDefaultConfig();
         host = getConfig().getString("database.host", "localhost");
